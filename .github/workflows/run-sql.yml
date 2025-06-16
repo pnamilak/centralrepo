@@ -1,0 +1,35 @@
+name: Run SQL from Source Repos
+
+on:
+  repository_dispatch:
+    types: [sql_update]
+
+jobs:
+  run-sql:
+    runs-on: ubuntu-latest
+    env:
+      SQL_SERVER: ${{ secrets.SQL_SERVER }}
+      SQL_USER:   ${{ secrets.SQL_USER }}
+      SQL_PASS:   ${{ secrets.SQL_PASS }}
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.client_payload.repo }}
+          token: ${{ secrets.CENTRAL_PAT }}
+
+      - name: Identify changed .sql files
+        id: sql_list
+        run: |
+          git log -1 --name-only --pretty="" | grep '\.sql$' > changed.txt || true
+          echo "Changed files:"
+          cat changed.txt
+
+      - name: Run SQL files
+        if: success()
+        run: |
+          while read file; do
+            echo "Executing $file..."
+            sqlcmd -S "$SQL_SERVER" -U "$SQL_USER" -P "$SQL_PASS" -i "$file"
+          done < changed.txt
