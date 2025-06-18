@@ -20,32 +20,31 @@ jobs:
       CENTRAL_PAT: ${{ secrets.CENTRAL_PAT }}
 
     steps:
-      - name: Parse repo names and execute SQLs
-        shell: powershell
-        run: |
-          $repos = "${{ github.event.inputs.repo_names }}".Split(',')
-          $branch = "${{ github.event.inputs.branch_name }}"
+      - - name: Parse repo names and execute SQLs
+  shell: powershell
+  run: |
+    $repos = "${{ github.event.inputs.repo_names }}".Split(',')
+    $branch = "${{ github.event.inputs.branch_name }}"
 
-          foreach ($repo in $repos) {
-            $repo = $repo.Trim()
-            Write-Host "Cloning $repo on branch $branch"
+    foreach ($repo in $repos) {
+      $repo = $repo.Trim()
+      Write-Host "Cloning $repo on branch $branch"
 
-            git clone --branch $branch https://x-access-token:${env:CENTRAL_PAT}@github.com/pnamilak/$repo.git temp-$repo
-            Set-Location temp-$repo
+      git clone --branch $branch https://x-access-token:${env:CENTRAL_PAT}@github.com/pnamilak/$repo.git temp-$repo
+      Set-Location temp-$repo
 
-            Write-Host "Finding changed SQL files in $repo"
-            $changedFiles = git log -1 --name-only --pretty=""
-            $sqlFiles = $changedFiles | Where-Object { $_ -like "*.sql" }
+      Write-Host "Finding changed SQL files in $repo"
+      $changedFiles = git diff --name-only HEAD~1 HEAD | Where-Object { $_ -like "*.sql" }
 
-            if ($sqlFiles.Count -eq 0) {
-              Write-Host "No .sql files found in last commit of $repo"
-            } else {
-              foreach ($file in $sqlFiles) {
-                Write-Host "Executing $file..."
-                & sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASS" -i "$file"
-              }
-            }
+      if (-not $changedFiles) {
+        Write-Host "No .sql files changed in last commit of $repo"
+      } else {
+        foreach ($file in $changedFiles) {
+          Write-Host "Executing $file..."
+          & sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASS" -i "$file"
+        }
+      }
 
-            Set-Location ..
-            Remove-Item -Recurse -Force "temp-$repo"
-          }
+      Set-Location ..
+      Remove-Item -Recurse -Force "temp-$repo"
+    }
