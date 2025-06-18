@@ -26,10 +26,14 @@ jobs:
           cd temp-repo
 
       - name: Identify changed .sql files
-        working-directory: temp-repo
+        shell: pwsh
         run: |
-          git log -1 --name-only --pretty="" | grep '\.sql$' > changed.txt || true
-          cat changed.txt
+          $changedFiles = git log -1 --name-only --pretty=""
+          $sqlFiles = $changedFiles | Where-Object { $_ -like "*.sql" }
+          $sqlFiles | Set-Content -Path changed.txt
+          Write-Host "Changed SQL files:"
+          Get-Content changed.txt
+
 
       - name: Execute SQL files
         working-directory: temp-repo
