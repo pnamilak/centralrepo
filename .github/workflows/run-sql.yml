@@ -1,32 +1,38 @@
 name: Run SQL from Source Repos
 
 on:
-  repository_dispatch:
-    types: [sql_update]
+  workflow_dispatch:
+    inputs:
+      repo_name:
+        description: 'Repo to execute SQL from (e.g. sqlrepo1)'
+        required: true
+      branch_name:
+        description: 'Branch to use (e.g. main or dev)'
+        required: true
 
 jobs:
   run-sql:
-    runs-on: [self-hosted, multiple-repo]  # your custom runner labels
+    runs-on: self-hosted
     env:
       SQL_SERVER: ${{ secrets.SQL_SERVER }}
-      SQL_USER:   ${{ secrets.SQL_USER }}
-      SQL_PASS:   ${{ secrets.SQL_PASS }}
+      SQL_USER: ${{ secrets.SQL_USER }}
+      SQL_PASS: ${{ secrets.SQL_PASS }}
+      CENTRAL_PAT: ${{ secrets.CENTRAL_PAT }}
 
     steps:
-      - name: Checkout source repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event.client_payload.repo }}
-          token: ${{ secrets.CENTRAL_PAT }}
+      - name: Clone selected repo and branch
+        run: |
+          git clone --branch "${{ github.event.inputs.branch_name }}" https://x-access-token:${CENTRAL_PAT}@github.com/pnamilak/${{ github.event.inputs.repo_name }}.git temp-repo
+          cd temp-repo
 
       - name: Identify changed .sql files
-        id: sql_list
+        working-directory: temp-repo
         run: |
           git log -1 --name-only --pretty="" | grep '\.sql$' > changed.txt || true
-          echo "Changed files:"
           cat changed.txt
 
-      - name: Run SQL files
+      - name: Execute SQL files
+        working-directory: temp-repo
         run: |
           while read file; do
             echo "Executing $file..."
