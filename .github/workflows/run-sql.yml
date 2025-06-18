@@ -6,7 +6,7 @@ on:
 
 jobs:
   run-sql:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, multiple-repo]  # your custom runner labels
     env:
       SQL_SERVER: ${{ secrets.SQL_SERVER }}
       SQL_USER:   ${{ secrets.SQL_USER }}
@@ -19,15 +19,6 @@ jobs:
           repository: ${{ github.event.client_payload.repo }}
           token: ${{ secrets.CENTRAL_PAT }}
 
-      - name: Install sqlcmd
-        run: |
-          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-          curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
-          sudo apt-get update
-          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools unixodbc-dev
-          echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
-          source ~/.bashrc
-
       - name: Identify changed .sql files
         id: sql_list
         run: |
@@ -36,9 +27,8 @@ jobs:
           cat changed.txt
 
       - name: Run SQL files
-        if: success()
         run: |
           while read file; do
             echo "Executing $file..."
-            /opt/mssql-tools/bin/sqlcmd -S "$SQL_SERVER" -U "$SQL_USER" -P "$SQL_PASS" -i "$file"
+            sqlcmd -S "$SQL_SERVER" -U "$SQL_USER" -P "$SQL_PASS" -i "$file"
           done < changed.txt
