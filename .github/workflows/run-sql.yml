@@ -13,6 +13,7 @@ on:
 jobs:
   run-sql:
     runs-on: self-hosted
+
     env:
       SQL_SERVER: ${{ secrets.SQL_SERVER }}
       SQL_USER: ${{ secrets.SQL_USER }}
@@ -20,7 +21,7 @@ jobs:
       CENTRAL_PAT: ${{ secrets.CENTRAL_PAT }}
 
     steps:
-      - name: Parse repo names and execute SQLs
+      - name: Run SQL scripts from changed files
         shell: powershell
         run: |
           $repos = "${{ github.event.inputs.repo_names }}".Split(',')
@@ -28,20 +29,33 @@ jobs:
 
           foreach ($repo in $repos) {
             $repo = $repo.Trim()
+            Write-Host "`n==================="
             Write-Host "Cloning $repo on branch $branch"
+            Write-Host "==================="
 
             git clone --branch $branch https://x-access-token:${env:CENTRAL_PAT}@github.com/pnamilak/$repo.git temp-$repo
             Set-Location temp-$repo
 
-            Write-Host "Finding changed SQL files in $repo"
-            $changedFiles = git diff --name-only HEAD~1 HEAD | Where-Object { $_ -like "*.sql" }
+            # Get last two commits
+            $lastTwoCommits = git rev-list --max-count=2 HEAD
+            $commitArray = $lastTwoCommits -split "`n"
+            $newestCommit = $commitArray[0]
+            $previousCommit = $commitArray[1]
+
+            Write-Host "Comparing commits $previousCommit to $newestCommit"
+
+            $changedFiles = git diff --name-only $previousCommit $newestCommit | Where-Object { $_ -like "*.sql" }
 
             if (-not $changedFiles) {
-              Write-Host "No .sql files changed in last commit of $repo"
+              Write-Host "No .sql files changed in last commit(s) of $repo"
             } else {
               foreach ($file in $changedFiles) {
-                Write-Host "Executing $file..."
-                & sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASS" -i "$file"
+                if (Test-Path $file) {
+                  Write-Host "Executing $file..."
+                  & sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASS" -i "$file"
+                } else {
+                  Write-Host "File $file not found. Skipping."
+                }
               }
             }
 
