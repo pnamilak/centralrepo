@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Parse repo names and execute SQLs
-        shell: pwsh
+        shell: powershell
         run: |
           $repos = "${{ github.event.inputs.repo_names }}".Split(',')
           $branch = "${{ github.event.inputs.branch_name }}"
