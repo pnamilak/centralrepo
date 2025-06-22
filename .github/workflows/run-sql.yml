@@ -44,7 +44,7 @@ jobs:
 
             Write-Host "Comparing commits $previousCommit to $newestCommit"
 
-            $changedFiles = git diff --name-only $previousCommit $newestCommit | Where-Object { $_ -like "*.sql" }
+            $changedFiles = git log --name-only --pretty="" -n 5 | Where-Object { $_ -like "*.sql" } | Select-Object -Unique
 
             if (-not $changedFiles) {
               Write-Host "No .sql files changed in last commit(s) of $repo"
